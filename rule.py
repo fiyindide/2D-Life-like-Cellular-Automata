@@ -1,0 +1,55 @@
+import numpy as np
+
+
+class Rule:
+    def __init__(self, mask: int):
+        self.mask = mask
+        # Decode mask into boolean arrays
+        self.birth, self.survive = decode(mask)
+        if mask < 0 or mask >= (1 << 18):
+            raise ValueError("Rule mask must be a valid 18-bit integer")
+
+    def __repr__(self):
+        return format_rule(self.birth, self.survive)
+
+
+def encode(B_set, S_set):
+    """Converts Birth and Survival sets to an 18-bit integer.
+        Returns the integer value of Birth and Survival sets combined.
+    """
+    mask = 0
+    for b in B_set:
+        mask |= (1 << b)
+    for s in S_set:
+        mask |= (1 << (s + 9))  # Survival starts at the 9th bit
+    return mask
+
+
+def decode(mask):
+    """Converts 18-bit integer back to boolean arrays of length 9."""
+    birth = np.zeros(9, dtype=bool)
+    survive = np.zeros(9, dtype=bool)
+    for k in range(9):
+        if (mask >> k) & 1:
+            birth[k] = True
+        if (mask >> (k + 9)) & 1:
+            survive[k] = True
+    return birth, survive
+
+
+def parse(rule_str: str):
+    """Parses strings like 'B3/S23' into array lists B and S sets."""
+    parts = rule_str.upper().split('/')
+    b_part = parts[0].replace('B', '')
+    s_part = parts[1].replace('S', '')
+
+    b_set = [int(digit) for digit in b_part]
+    s_set = [int(digit) for digit in s_part]
+    return b_set, s_set
+
+
+def format_rule(birth_bool, survive_bool):
+    """Converts boolean arrays back to 'B.../S...' string format."""
+    b_str = "".join(str(i) for i, val in enumerate(birth_bool) if val)
+    s_str = "".join(str(i) for i, val in enumerate(survive_bool) if val)
+    return f"B{b_str}/S{s_str}"
