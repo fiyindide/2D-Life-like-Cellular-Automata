@@ -1,2 +1,15 @@
-# created by virtualenv automatically
+# Virtual environments
+venv/
+.venv/
 
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# IDE files
+.idea/
+
+# Generated outputs
+data/
+figures/
