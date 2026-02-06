@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from life_like import step
 from rule import Rule
+from rule import parse, encode
+import os
 
 
 def sample_bernoulli_grid(N, d, rng):
@@ -43,26 +45,38 @@ def measure_one_step_density(rule, N, d_list, trials, seed):
     # Convert to DataFrame
     return pd.DataFrame(results)
 
+# Centralized Configuration
+CONFIG = {
+    "N": 256,
+    "trials": 50,
+    "seed": 42,
+    "rule_str": "B3/S23",
+    "d_values": np.linspace(0.05, 0.95, 19)
+}
+
+def get_filename():
+    clean_rule = CONFIG["rule_str"].replace('/', '')
+    return f"data/life_{clean_rule}_N{CONFIG['N']}_trials{CONFIG['trials']}.csv"
 
 if __name__ == "__main__":
-    from rule import parse, encode
+    # Ensure the data directory exists
+    os.makedirs("data", exist_ok=True)
 
-    # Configuration
-    N = 256
-    trials = 50
-    seed = 42
-    rule_str = "B3/S23"
-    # Generate 19 evenly spaced values between 0.05 and 0.95 (inclusive)
-    d_values = np.linspace(0.05, 0.95, 19)
-
-    # Setup rule
-    b, s = parse(rule_str)
+    # 1. Access values via CONFIG
+    b, s = parse(CONFIG["rule_str"])
     rule = Rule(encode(b, s))
 
-    # Generate data
-    df = measure_one_step_density(rule, N, d_values, trials, seed)
+    # 2. Run simulation using CONFIG values
+    print(f"Generating data for {CONFIG['rule_str']}...")
+    df = measure_one_step_density(
+        rule,
+        CONFIG["N"],
+        CONFIG["d_values"],
+        CONFIG["trials"],
+        CONFIG["seed"]
+    )
 
-    # Save data in a csv file
-    filename = f"data/life_{rule_str.replace('/', '')}_N{N}_trials{trials}.csv"
+    # 3. Save using the helper function
+    filename = get_filename()
     df.to_csv(filename, index=False)
     print(f"Dataset saved to {filename}")

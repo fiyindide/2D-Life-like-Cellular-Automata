@@ -23,7 +23,8 @@ def encode(B_set, S_set):
     for s in S_set:
         mask |= (1 << (s + 9))  # Survival starts at the 9th bit
     return mask
-
+# 000000000 000001000
+# 000000100
 
 def decode(mask):
     """Converts 18-bit integer back to boolean arrays of length 9."""
@@ -53,3 +54,5 @@ def format_rule(birth_bool, survive_bool):
     b_str = "".join(str(i) for i, val in enumerate(birth_bool) if val)
     s_str = "".join(str(i) for i, val in enumerate(survive_bool) if val)
     return f"B{b_str}/S{s_str}"
+
+
