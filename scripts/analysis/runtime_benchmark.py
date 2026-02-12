@@ -22,7 +22,7 @@ def run_benchmark():
 
     d = data['d'].values
     p_hat = data['p_hat'].values
-    sigma = data['std_dev'].values
+    sigma = data['p_std'].values
 
     num_rules = 2 ** 18  # 262,144
     M = len(d)  # Number of density points

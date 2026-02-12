@@ -47,11 +47,13 @@ def plot_best_fit_results(num_random=3):
 
         d_exp = df['d'].values
         p_hat = df['p_hat'].values
-        sigma = df['std_dev'].values
+        sigma = df['p_std'].values
 
-        # 3. Use solver to find the "Fitted" rule
-        best_idx, (b_fit, s_fit), score, _ = fit_rule_from_density_curve(d_exp, p_hat, sigma)
-        fitted_rule_str = format_rule(b_fit, s_fit)
+        # 3. Use solver to find the "Fitted" rule from the inverse solver
+        best_idx, fitted_rule_str, best_lists, top_candidates = fit_rule_from_density_curve(d_exp, p_hat, sigma)
+
+        # Access the score directly from the top candidate
+        best_score = top_candidates[0]['score']
 
         # 4. Generate Analytic Curves for both
         d_model = np.linspace(0, 1, 100)

@@ -17,6 +17,7 @@ def sample_bernoulli_grid(N, d, rng):
 def measure_one_step_density(rule, N, d_list, trials, seed):
     """
     Measures the fraction of alive cells after one-step, p_hat(d), for a given rule.
+    Includes standardized metadata columns in the output.
     """
 
     rng = np.random.default_rng(seed)
@@ -37,9 +38,14 @@ def measure_one_step_density(rule, N, d_list, trials, seed):
 
         # Calculate statistics across trials
         results.append({
-            'd': d,
-            'p_hat': np.mean(p_hat_trial_densities),
-            'std_dev': np.std(p_hat_trial_densities)
+            'd': d,                 # Initial density
+            'p_hat': np.mean(p_hat_trial_densities), # Measured next-step density
+            'p_std': np.std(p_hat_trial_densities),   # Empirical standard deviation
+            'N': N,                 # Grid size
+            'trials': trials,       # Number of trials
+            'seed': seed,           # Random seed
+            'rule_mask': rule.mask,  # The 18-bit integer mask
+            'boundary': "periodic"  # Explicit boundary column
         })
 
     # Convert to DataFrame
@@ -76,7 +82,7 @@ if __name__ == "__main__":
         CONFIG["seed"]
     )
 
-    # 3. Save using the helper function
+    # 3. Save file
     filename = get_filename()
     df.to_csv(filename, index=False)
     print(f"Dataset saved to {filename}")

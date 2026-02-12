@@ -1,7 +1,6 @@
 import numpy as np
 from forward_map import AnalyticForwardMap
-from rule import decode
-
+from rule import decode, format_rule, bool_to_list
 
 def fit_rule_from_density_curve(d, p_hat, sigma=None):
     """
@@ -16,22 +15,17 @@ def fit_rule_from_density_curve(d, p_hat, sigma=None):
     Returns:
         tuple: (best_rule_mask, (B, S) sets, objective_value, top_k_candidates)
     """
-    top_k = 5   # number of top candidates to be observed
+    top_k = 5  # number of top candidates to be observed
     epsilon = 1e-6   # Regularization constant to prevent division by zero
 
-    # This precomputes the PB and PS tables (512 x num_den) with the observed densities
     forward_map = AnalyticForwardMap(d)
-
-    num_rules = 2 ** 18  # 262,144 rules
-
-    # initialize the error score of each rule with '0'
+    num_rules = 2 ** 18
     scores = np.zeros(num_rules)
 
     # Iterate through every possible 18-bit rule mask
     for mask in range(num_rules):
         # Retrieve the (1 x num_den) prediction vector using the lookup tables
         p_pred = forward_map.predict(mask)
-
         # Calculate Objective Value (SSE vs WSSE)
         if sigma is not None:
             # Weighted Least Squares (WSSE)
@@ -43,25 +37,25 @@ def fit_rule_from_density_curve(d, p_hat, sigma=None):
         # Update the score for the specific rule
         scores[mask] = np.sum(diff)
 
-
-    # Find the corresponding index (mask) of the least error score
     best_idx = np.argmin(scores)
-
-    # Sort all 262,144 rule scores and select the 'top_k' best matches (lowest error first)
     top_indices = np.argsort(scores)[:top_k]
 
     top_candidates = []
     for idx in top_indices:
-        b_set, s_set = decode(idx)
-
-        # Construct a dictionary for each candidate rule for easy reporting
+        b_bool, s_bool = decode(idx)
         top_candidates.append({
+            "rank": len(top_candidates) + 1,
             "mask": int(idx),
-            "rule": f"B{''.join(map(str, b_set))}/S{''.join(map(str, s_set))}",
+            "rule": format_rule(b_bool, s_bool),
+            "b_list": bool_to_list(b_bool),
+            "s_list": bool_to_list(s_bool),
             "score": float(scores[idx])
         })
 
-    # Decouple the winning mask/rule into Birth and Survival sets
-    best_b, best_s = decode(best_idx)
-
-    return best_idx, (best_b, best_s), scores[best_idx], top_candidates
+    best_b_bool, best_s_bool = decode(best_idx)
+    return (
+        best_idx,
+        format_rule(best_b_bool, best_s_bool),
+        (bool_to_list(best_b_bool), bool_to_list(best_s_bool)),
+        top_candidates
+    )
