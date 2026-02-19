@@ -22,6 +22,7 @@ def get_bernstein_coefficients(mask):
     for m in range(1, 9):
         alpha[m] = ((9 - m) / 9.0) * b[m] + (m / 9.0) * s[m - 1]
 
+    # return the coefficient vector α = (α0, α1, . . . , α9).
     return tuple(np.round(alpha, 10))
 
 
