@@ -68,7 +68,6 @@ def test_simulated_recovery():
     # Load standardized dataset
     df = pd.read_csv(csv_path)
 
-    # Use the standardized wrapper reflecting professor's feedback
     results = fit_from_standard_df(df)
 
     print(f"\nStandardized Recovery Results:")
