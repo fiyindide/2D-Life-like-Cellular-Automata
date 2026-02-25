@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from forward_map import AnalyticForwardMap
 from rule import decode, format_rule, bool_to_list
 
@@ -47,15 +48,34 @@ def fit_rule_from_density_curve(d, p_hat, sigma=None):
             "rank": len(top_candidates) + 1,
             "mask": int(idx),
             "rule": format_rule(b_bool, s_bool),
-            "b_list": bool_to_list(b_bool),
-            "s_list": bool_to_list(s_bool),
             "score": float(scores[idx])
         })
 
-    best_b_bool, best_s_bool = decode(best_idx)
-    return (
-        best_idx,
-        format_rule(best_b_bool, best_s_bool),
-        (bool_to_list(best_b_bool), bool_to_list(best_s_bool)),
-        top_candidates
-    )
+    return best_idx, top_candidates
+
+def fit_from_standard_df(df):
+    """
+    Return solver outputs.
+    Returns:
+        (i) best rule mask,
+        (ii) best (B, S) in human-readable notation,
+        (iii) score (SSE/WSSE),
+        (iv) top-K candidates with readable strings.
+    """
+    # Standardized extraction
+    d = df['d'].values
+    p_hat = df['p_hat'].values
+    sigma = df['p_std'].values if 'p_std' in df.columns else None
+
+    best_idx, top_candidates = fit_rule_from_density_curve(d, p_hat, sigma)
+
+    # Retrieve human-readable B/S for the best rule
+    best_b, best_s = decode(best_idx)
+    readable_rule = format_rule(best_b, best_s)
+
+    return {
+        "best_mask": best_idx,
+        "best_rule_str": readable_rule,
+        "best_score": top_candidates[0]['score'],
+        "top_k": top_candidates
+    }

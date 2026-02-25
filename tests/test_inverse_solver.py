@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import pytest
 import random
-from inverse_fit import fit_rule_from_density_curve
+from inverse_fit import fit_rule_from_density_curve, fit_from_standard_df
 from forward_map import AnalyticForwardMap
 from rule import Rule, encode, decode, parse, format_rule
 from data_gen import CONFIG, get_filename
@@ -36,15 +36,15 @@ def test_exact_inversion():
     p_perfect = fm.predict(true_rule_mask)
 
     # Run Solver
-    best_mask, recovered_str, rule_lists, top_candidates = fit_rule_from_density_curve(d, p_perfect)
+    best_mask, top_candidates = fit_rule_from_density_curve(d, p_perfect)
 
     # Extract SSE score from the best candidate
     best_score = top_candidates[0]['score']
+    recovered_str = top_candidates[0]['rule']
 
     # Print comparative Output
     print(f"Ground Rule:    {ground_rule_str}")
     print(f"Recovered Rule: {recovered_str}")
-    print(f"Neighbor Lists: B{rule_lists[0]}/S{rule_lists[1]}")
     print(f"SSE Mode Score: {best_score:.2e}")
 
     # Verification Assertions
@@ -58,33 +58,33 @@ def test_simulated_recovery():
     P:S: You must run data_gen.py first
     """
     csv_path = get_filename()
+    if not os.path.exists(csv_path):
+        print("Please run data_gen.py first.")
+        return
+
     b, s = parse(CONFIG["rule_str"])
     target_mask = encode(b, s)
 
-    if not os.path.exists(csv_path):
-        pytest.skip(f"Data not found. Run data_gen.py first.")
+    # Load standardized dataset
+    df = pd.read_csv(csv_path)
 
-    data = pd.read_csv(csv_path)
+    # Use the standardized wrapper reflecting professor's feedback
+    results = fit_from_standard_df(df)
 
-    # Handles the 4 return values from the new solver
-    best_mask, best_str, best_lists, top_results = fit_rule_from_density_curve(
-        data['d'].values,
-        data['p_hat'].values,
-        data['p_std'].values
-    )
-
-    print("\n Top 5 Inverse Solver Candidates ")
-    print(f"{'Rank':<6} | {'Rule':<12} | {'Score (WSSE)':<12}")
-    print("-" * 40)
-
-    # Rank the top candidates using the pre-formatted 'rule' string from the solver
-    for res in top_results:
+    print(f"\nStandardized Recovery Results:")
+    print(f"(i)   Best Mask: {results['best_mask']}")
+    print(f"(ii)  Best Rule: {results['best_rule_str']}")
+    print(f"(iii) Best Score: {results['best_score']:.6f}")
+    print(f"(iv)  Top-K Strings:")
+    for res in results['top_k']:
         marker = " <--- (Best Match!)" if res['mask'] == target_mask else ""
+        print(f"      Rank {res['rank']}: {res['rule']} (Score: {res['score']:.6f}{marker})")
 
-        # Print results in a table using the human-readable string
-        print(f"{res['rank']:<6} | {res['rule']:<12} | {res['score']:<12.6f}{marker}")
+    # Assert success based on target mask from CONFIG
+    b, s = parse(CONFIG["rule_str"])
+    target_mask = encode(b, s)
+    assert results['best_mask'] == target_mask, f"Failed! Expected {CONFIG['rule_str']}, found {best_str}"
 
-    assert best_mask == target_mask, f"Failed! Expected {CONFIG['rule_str']}, found {best_str}"
 
 
 def test_analytic_precision():
@@ -104,3 +104,5 @@ if __name__ == "__main__":
     test_exact_inversion()
     test_analytic_precision()
     test_simulated_recovery()
+
+
