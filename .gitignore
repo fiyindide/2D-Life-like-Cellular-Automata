@@ -11,7 +11,7 @@ __pycache__/
 
 # IDE files
 .idea/
-
+experiment.py
 # Generated outputs
 data/
 figures/
