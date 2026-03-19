@@ -2,7 +2,7 @@
 venv/
 .venv/
 
-
+notes
 
 # Python cache
 __pycache__/

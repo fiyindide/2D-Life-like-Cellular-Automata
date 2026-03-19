@@ -2,11 +2,10 @@ import numpy as np
 from scipy.special import comb
 from rule import decode
 
-
 class AnalyticForwardMap:
     """
         Computes the Forward Map, p(d; B, S)  using the closed form expression for
-        calculating the the probability that a cell with 8 neighbors, in a grid
+        calculating the probability that a cell with 8 neighbors, in a grid
         with density d, has exactly 'k' of those neighbors are alive.
     """
     def __init__(self, d_values):

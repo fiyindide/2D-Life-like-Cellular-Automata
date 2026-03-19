@@ -24,23 +24,6 @@ def neighbor_count_torus(grid):
     return neighbor_count_grid
 
 
-# def test_single_cell():
-#     # 1. Create a 3x3 grid with only the center cell (1, 1) alive
-#     # Original Grid:
-#     # 0 0 0
-#     # 0 1 0
-#     # 0 0 0
-#     grid = np.zeros((3, 3), dtype=np.uint8)
-#     grid[1, 1] = 1
-#
-#     # 2. Compute the neighbor counts
-#     neighbor_count_grid = neighbor_count_torus(grid)
-#
-#     print(neighbor_count_grid)
-
-#test_single_cell()
-
-
 def step(grid, rule):
     """
     Advances the grid by one time step according to the Rule object.
