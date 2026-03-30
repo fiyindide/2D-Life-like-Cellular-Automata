@@ -1,0 +1,1 @@
+•	bit-flip experiment introduces sensor corruption,We will vary ϵ and again measure how recovery degrades, and whether weighted least squares using empirical pstd provides a tangible improvement compared to unweighted least squares 

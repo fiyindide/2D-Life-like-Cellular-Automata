@@ -1,158 +1,105 @@
-
 import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from collections import Counter
-from scipy.signal import convolve2d
+from scipy.ndimage import gaussian_filter
 from inverse_fit import fit_rule_from_density_curve
-from rule import parse, encode, Rule, format_rule, decode
+from rule import parse, encode, Rule
 from life_like import step
 
-
-def generate_correlated_state(N, d, smoothing_radius=1):
+def run_mismatch_experiment(N=100, num_den=25, trials=20, rule_str="B3/S23"):
     """
-    Generates an NxN grid with spatial correlation (clumping) while maintaining a target density.
-    This simulates 'Model Mismatch' by violating the i.i.d. assumption.
+        Stress-tests the solver against Model Mismatch (Spatial Correlation).
+        Directly violates the assumption that the initial configuration is
+        generated as i.i.d. Bernoulli(d).
     """
-    # Create initial white noise (completely independent random values)
-    raw_noise = np.random.rand(N, N)
 
-    if smoothing_radius > 0:
-        # Determine kernel size for local averaging based on the radius
-        size = int(2 * np.ceil(smoothing_radius) + 1)
-        # Create a uniform square kernel (box filter)
-        kernel = np.ones((size, size))
-
-        # Apply 2D convolution to smooth the noise and wrap the boundaries
-        smoothed = convolve2d(raw_noise, kernel, mode='same', boundary='wrap')
-    else:
-        # If radius is 0, keep the independent white noise (i.i.d. case)
-        smoothed = raw_noise
-
-    # To maintain the specific target density 'd', we threshold the smoothed values.
-    # We find the percentile cutoff so that exactly d% of cells become 'Alive' (1).
-    cutoff = np.percentile(smoothed, 100 * (1 - d))
-
-    # Return binary grid: 1 where value is above cutoff, 0 otherwise
-    return (smoothed >= cutoff).astype(np.uint8)
-
-
-def run_model_mismatch_experiment(N=100, num_den=25, trials=20):
-    """
-    Core experiment loop: Tests the solver's ability to recover B3/S23 from 'clumpy' grids.
-    """
-    # Define granular smoothing radii to observe the 'failure cliff'
-    radii = [0, 0.25, 0.5, 0.75, 1.0]
-
-    # Setup the 'Ground Truth' rule (Game of Life)
-    rule_str = "B3/S23"
-    b_set, s_set = parse(rule_str)
-    true_mask = encode(b_set, s_set)
+    # Initialize experimental parameters
+    sigmas = [0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]  # Gaussian smoothing strengths
+    true_mask = encode(*parse(rule_str))
     rule_obj = Rule(true_mask)
-
-    # Sample density points across the range [0.05, 0.95]
     d_vals = np.linspace(0.05, 0.95, num_den)
     results = []
+    all_collisions = Counter()  # Tracks names of rules that 'tie' or 'beat' the true rule
 
-    print(f"\n Starting Model Mismatch Experiment...")
+    print(f"\n[Exp 3] Starting Mismatch Experiment for {rule_str}...")
 
-    # Iterate through each correlation level (smoothing radius)
-    for r in radii:
-        correct_count = 0
-        total_margin = 0
-        imposter_counts = Counter()
-
+    for s in sigmas:
+        correct_count, margins = 0, []
         for t in range(trials):
             p_observed = []
             for d in d_vals:
-                # Generate the correlated (clumpy) initial state
-                X0_raw = generate_correlated_state(N, d, smoothing_radius=r)
+                # Generate Structured Initial State
+                raw = np.random.rand(N, N)
 
-                # Ensure data type is compatible with the life_like engine
-                X0 = X0_raw.astype(np.uint8)
+                # Apply Gaussian filter
+                smoothed = gaussian_filter(raw, sigma=s, mode='wrap') if s > 0 else raw
+                # Threshold the smoothed grid to preserve the marginal density 'd'
+                X0 = (smoothed >= np.percentile(smoothed, 100 * (1 - d))).astype(np.uint8)
+                # Run one CA step and measure the resulting density
+                p_observed.append(np.mean(step(X0, rule_obj)))
 
-                # Advance the grid by one CA step (Numerical Truth)
-                X1 = step(X0, rule_obj)
-
-                # Measure the resulting density (the observed outcome)
-                p_observed.append(np.mean(X1))
-
-            p_observed = np.array(p_observed)
-
-            # Apply the Solver
-            best_mask, top_candidates = fit_rule_from_density_curve(d_vals, p_observed)
-
-            # Calculate Solver Confidence (Margin between best and second-best guess)
-            if len(top_candidates) > 1:
-                margin = top_candidates[1]['score'] - top_candidates[0]['score']
-            else:
-                margin = 0
-            total_margin += margin
-
-            # Track success vs failure
+            # Invoke solver
+            best_mask, top_candidates = fit_rule_from_density_curve(d_vals, np.array(p_observed))
+            # Check for Success
             if best_mask == true_mask:
                 correct_count += 1
             else:
-                # Record which 'Imposter' rule the solver confidently picked instead
-                imposter_counts[top_candidates[0]['rule']] += 1
+                all_collisions[top_candidates[0]['rule']] += 1
+            margins.append(top_candidates[1]['score'] - top_candidates[0]['score'])
 
-        # Average metrics across all trials for this specific radius
-        accuracy = correct_count / trials
-        avg_margin = total_margin / trials
-        top_imp = imposter_counts.most_common(1)[0][0] if imposter_counts else "None"
+        results.append({"level": s, "accuracy": correct_count/trials, "margin": np.mean(margins)})
+        print(f"  Sigma: {s:.2f} | Accuracy: {(correct_count/trials)*100:>5.1f}%")
 
-        results.append({
-            "radius": r,
-            "accuracy": accuracy,
-            "margin": avg_margin,
-            "top_imposter": top_imp
-        })
-
-        print(f"  r={r:.2f} | Acc: {accuracy * 100:>5.1f}% | Confidence: {avg_margin:.2e} | Imposter: {top_imp}")
-
-    return pd.DataFrame(results)
+    return pd.DataFrame(results), all_collisions, rule_str
 
 
 if __name__ == "__main__":
-    # Execute the experiment
-    df_mismatch = run_model_mismatch_experiment()
+    target_rule = "B3678/S34678"
+    # Capture the three return values
+    df_mismatch, all_collisions, rule_name = run_mismatch_experiment(rule_str=target_rule)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    # Save Imposter Data to CSV
+    data_dir = "data"
+    if not os.path.exists(data_dir): os.makedirs(data_dir)
 
-    # Plot 1: Recovery Accuracy
-    color_acc = 'tab:purple'
-    ax1.plot(df_mismatch['radius'], df_mismatch['accuracy'],
-             color=color_acc, marker='o', lw=2.5, label='Accuracy')
-    ax1.set_xlabel('Smoothing Radius (r)', fontsize=11)
-    ax1.set_ylabel('Recovery Accuracy', fontsize=11, fontweight='bold')
-    ax1.set_title('Rule Recovery Rate', fontsize=12)
-    ax1.set_ylim(-0.05, 1.05)
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
+    clean_rule = rule_name.replace("/", "")
+    imposter_df = pd.DataFrame(all_collisions.most_common(), columns=['Imposter_Rule', 'Count'])
+    imposter_df.to_csv(f"{data_dir}/mismatch_imposters_{clean_rule}.csv", index=False)
 
-    # Plot 2: Solver Confidence (Margin)
-    color_marg = 'tab:gray'
-    ax2.plot(df_mismatch['radius'], df_mismatch['margin'],
-             color=color_marg, linestyle='--', marker='s', lw=2, label='Confidence (SSE Diff)')
-    ax2.set_xlabel('Smoothing Radius (r)', fontsize=11)
-    ax2.set_ylabel('Solver Margin (Log Scale)', fontsize=11, fontweight='bold')
-    ax2.set_title('Solver Confidence', fontsize=12)
-    ax2.set_yscale('log')
-    ax2.grid(True, which="both", ls="-", alpha=0.2)
-    ax2.legend()
-    plt.tight_layout()
-
-    # Ensure output directory exists before saving
+    # Visualization
     output_dir = "figures"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    if not os.path.exists(output_dir): os.makedirs(output_dir)
 
-    save_path = os.path.join(output_dir, "thesis_mismatch_experiment_3.png")
+    clean_rule = rule_name.replace("/", "")
+
+    plt.figure(figsize=(12, 5))
+
+    # Accuracy Plot (Teal)
+    plt.subplot(1, 2, 1)
+    plt.plot(df_mismatch['level'], df_mismatch['accuracy'], marker='o', color='teal', lw=2)
+    plt.title(f"Recovery Accuracy: {rule_name}")
+    plt.xlabel(r"Smoothing Strength ($\sigma$)") # Specific label for Mismatch
+    plt.ylabel("Success Rate")
+    plt.ylim(-0.05, 1.05)
+    plt.grid(True, alpha=0.3)
+
+    # Margin Plot (Dark Orange)
+    plt.subplot(1, 2, 2)
+    plt.plot(df_mismatch['level'], df_mismatch['margin'], marker='s', ls='--', color='darkorange', lw=2)
+    plt.title("Solver Margin (Confidence Gap)")
+    plt.xlabel(r"Smoothing Strength ($\sigma$)")
+    plt.ylabel("SSE Difference (Log Scale)")
+    plt.yscale('log')
+    plt.grid(True, which="both", ls="-", alpha=0.2)
+
+    plt.tight_layout()
+    # Save using the standardized thesis prefix
+    save_path = os.path.join(output_dir, f"mismatch_experiment_{clean_rule}.png")
     plt.savefig(save_path, dpi=300)
-    print(f"\nExperiment complete. Plot saved to: {save_path}")
     plt.show()
 
-    # Display qualitative imposter analysis
-    print("\n--- Imposter Analysis ---")
-    print(df_mismatch[['radius', 'accuracy', 'top_imposter']])
+    print(f"\n--- Top Imposter Rules (Mismatch Experiment) ---")
+    for rule, count in all_collisions.most_common(5):
+        print(f"Rule {rule}: {count} times")

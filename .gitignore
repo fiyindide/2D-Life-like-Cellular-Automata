@@ -3,15 +3,17 @@ venv/
 .venv/
 
 notes
+experiment.py
+noise_experiment.py
 
 # Python cache
 __pycache__/
 *.pyc
 .pytest_cache/
 
-# IDE files
+# IDE filesgit rm --cached <filename>
 .idea/
-experiment.py
+
 # Generated outputs
 data/
 figures/
