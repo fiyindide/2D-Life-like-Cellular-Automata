@@ -3,8 +3,7 @@ venv/
 .venv/
 
 notes
-experiment.py
-noise_experiment.py
+miscelleneous
 
 # Python cache
 __pycache__/
@@ -16,4 +15,3 @@ __pycache__/
 
 # Generated outputs
 data/
-figures/
